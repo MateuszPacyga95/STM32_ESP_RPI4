@@ -77,7 +77,10 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  /* Initialize SPI transfer buffers properly */
+  /* Use local variables for TX/RX instead of invalid pointers */
+  
+  /* USER CODE NOTE: move actual transfer to after peripheral init */
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -95,6 +98,26 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  /* Example: transmit one byte (0x50) and receive one byte into `rx` */
+  uint8_t tx = 0x50;
+  uint8_t rx = 0x00;
+
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
+  HAL_Delay(1);
+  if (HAL_SPI_TransmitReceive(&hspi2, &tx, &rx, 2, HAL_MAX_DELAY) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  uint8_t test = 0xAA;
+
+while (1)
+{
+    HAL_SPI_Transmit(&hspi2, &test, 1, HAL_MAX_DELAY);
+    HAL_Delay(100);
+}
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
   /* USER CODE END 2 */
 
   /* Infinite loop */
