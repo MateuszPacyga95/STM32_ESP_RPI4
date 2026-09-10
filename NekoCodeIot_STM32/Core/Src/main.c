@@ -25,7 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include "bme680.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+BME680_HandleTypeDef bme680;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,26 +99,12 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  /* Example: transmit one byte (0x50) and receive one byte into `rx` */
-  uint8_t tx = 0x50;
-  uint8_t rx = 0x00;
+  
+  BME680_Init(&bme680, &hspi2, BME680_REG_ID); // Initialize BME680 with SPI handle and I2C address
 
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-  HAL_Delay(1);
-  if (HAL_SPI_TransmitReceive(&hspi2, &tx, &rx, 2, HAL_MAX_DELAY) != HAL_OK)
-  {
-    Error_Handler();
-  }
 
-  uint8_t test = 0xAA;
+  
 
-while (1)
-{
-    HAL_SPI_Transmit(&hspi2, &test, 1, HAL_MAX_DELAY);
-    HAL_Delay(100);
-}
-  HAL_Delay(1);
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -181,6 +168,16 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+int __io_putchar(int ch)
+{
+  /* Place your implementation of fputc here */
+  /* e.g. write a character to the USART2 and Loop until the end of transmission */
+  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
+
+  return ch;
+}
+
+
 
 /* USER CODE END 4 */
 
