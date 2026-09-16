@@ -48,6 +48,7 @@
 
 /* USER CODE BEGIN PV */
 BME680_HandleTypeDef bme680;
+uint32_t temperature = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,11 +101,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   
-  BME680_Init(&bme680, &hspi2, BME680_REG_ID); // Initialize BME680 with SPI handle and I2C address
+  BME680_Init(&bme680, &hspi2); // Initialize BME680 with SPI handle and I2C address
 
+  BME680_SetForcedMode(&bme680); // Set BME680 to forced mode
 
-  
+  BME680_SetTemperatureOversampling(&bme680, BME680_T_OVERSAMPLING_1X); // Set temperature oversampling to 1x
 
+  BME680_ReadTemperature(&bme680, &temperature); // Read temperature from BME680
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -114,6 +117,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    // Wait 2 seconds before next reading
+    HAL_Delay(2000);
   }
   /* USER CODE END 3 */
 }
