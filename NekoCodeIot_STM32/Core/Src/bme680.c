@@ -131,7 +131,7 @@ static uint32_t readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
     }
     HAL_Delay(1);
     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
-    return (retVal[0] << 16) | (retVal[1] << 8) | (retVal[2] >> 4);
+    return (retVal[0] << 12) | (retVal[1] << 4) | (retVal[2] >> 4);
 }
 
 static void writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)
