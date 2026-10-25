@@ -6,7 +6,6 @@
 static void writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
 static uint8_t readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
 static uint16_t readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
-static uint16_t readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
 static uint32_t readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
 
 
@@ -80,7 +79,7 @@ static uint8_t readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
 
   uint8_t retVal = 0;
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-  HAL_Delay(1);
+  HAL_Delay(100);
   if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK)
   {
       Error_Handler();
@@ -89,7 +88,7 @@ static uint8_t readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
   {
       Error_Handler();
   }
-  HAL_Delay(1);
+  HAL_Delay(100);
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
 
   return retVal;
@@ -148,3 +147,39 @@ static void writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint
   HAL_Delay(1);
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
 }
+
+// #define BME680_MAX_READ_LEN 32U
+
+// HAL_StatusTypeDef BME680_ReadRegisters( SPI_HandleTypeDef *spiHandle,uint8_t regAddr,uint8_t *buffer,uint16_t length)
+// {
+//     regAddr |= 0x80; // Set MSB for read operation
+//     if(buffer == NULL || length == 0 || spiHandle == NULL || length > BME680_MAX_READ_LEN)
+//     {
+//         return HAL_ERROR;
+//     }
+
+//     uint16_t txSize = 1 + length; // 1 byte for register address + length of data to read
+
+//     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
+//     HAL_Delay(1);
+
+//     uint8_t txbuffer[BME680_MAX_READ_LEN+1] = {regAddr, 0}; // Prepare transmit buffer with register address and dummy byte
+//     uint8_t rxBuffer[BME680_MAX_READ_LEN + 1U] = {0};
+    
+// 	if(HAL_SPI_TransmitReceive(spiHandle, txbuffer, rxBuffer, txSize, HAL_MAX_DELAY) != HAL_OK) // Transmit register address and receive chip ID
+// 	{
+// 	    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
+// 	    return HAL_ERROR;
+// 	}
+
+//     // Copy the received data to the output buffer
+//     for(uint16_t i = 0; i < length; i++)
+//     {
+//         buffer[i] = rxBuffer[i + 1];
+//     }
+
+//     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
+
+//     return HAL_OK;
+
+// }

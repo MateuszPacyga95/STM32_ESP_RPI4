@@ -113,13 +113,49 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
+  {//TEST
+	  //extern SPI_HandleTypeDef hspi1;
+	  //
+	  //#define BME680_CS_GPIO_Port GPIOB
+	  //#define BME680_CS_Pin GPIO_PIN_6
+	  //#define BME680_REG_ID               0x50
+	  //
+	  //
+	  //HAL_StatusTypeDef BME680_ReadChipID(uint8_t *chip_id)
+	  //{
+	  //    if(chip_id == NULL)
+	  //    {
+	  //        return HAL_ERROR; // Return error if chip_id pointer is NULL
+	  //    }
+	  //
+	  //    uint8_t tx[2] = {BME680_REG_ID | 0x80, 0}   ; // Set MSB for read operation
+	  //    uint8_t rx[2] = {0}; // Buffer to store received data
+	  //
+	  //    HAL_GPIO_WritePin(BME680_CS_GPIO_Port, BME680_CS_Pin, GPIO_PIN_RESET); // Set CS low
+	  //
+	  //    HAL_Delay(1); // Short delay to ensure CS is stable
+	  //    if(HAL_SPI_TransmitReceive(&hspi1, &tx, &rx, 2, HAL_MAX_DELAY) != HAL_OK) // Transmit register address and receive chip ID
+	  //    {
+	  //        HAL_GPIO_WritePin(BME680_CS_GPIO_Port, BME680_CS_Pin, GPIO_PIN_SET); // Set CS high
+	  //        return HAL_ERROR;
+	  //    }
+	  //
+	  //    // 5. Ustaw CS na HIGH
+	  //    HAL_GPIO_WritePin(BME680_CS_GPIO_Port, BME680_CS_Pin, GPIO_PIN_SET); // Set CS high
+	  //    // 6. Zwróć status komunikacji
+	  //    *chip_id = rx[1]; // Extract the chip ID from the received data
+	  //    return HAL_OK;
+	  //}
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+    HAL_Delay(500); // Delay for 500 ms
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+    HAL_Delay(500); 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
     // Wait 2 seconds before next reading
-    HAL_Delay(2000);
+
   }
   /* USER CODE END 3 */
 }

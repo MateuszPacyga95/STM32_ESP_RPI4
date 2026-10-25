@@ -64,3 +64,7 @@ BME680_Status BME680_ReadTemperature    (BME680_HandleTypeDef *bme680, int32_t *
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 
 #endif /* INC_BME680_H */
+
+
+
+
