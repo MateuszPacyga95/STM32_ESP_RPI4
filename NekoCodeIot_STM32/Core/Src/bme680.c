@@ -1,185 +1,257 @@
-
 #include "bme680.h"
 #include "spi.h"
 #include "gpio.h"
 
-static void writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
-static uint8_t readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
-static uint16_t readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
-static uint32_t readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx);
+#define BME680_SPI_MEM_PAGE0_VALUE 0x00U
+#define BME680_SPI_MEM_PAGE1_VALUE 0x10U
+
+static BME680_Status writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
+static BME680_Status writeSpiRegisterRaw(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
+static BME680_Status setSpiMemoryPage(SPI_HandleTypeDef* spiHandle, uint8_t regAddr);
+static BME680_Status readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint8_t *retValue);
+static BME680_Status readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint16_t *retValue);
+static BME680_Status readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint32_t *retValue, uint8_t tx);
 
 
 BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
 {
-    uint8_t chip_id = 0x00;
+    uint8_t chip_id = 0;
+    uint16_t raw_t2 = 0;
+    uint8_t raw_t3 = 0;
+
     bme680->hspi = hspi;
 
-    chip_id = readSpi8bitRegister(bme680->hspi, BME680_REG_ID); // Read the chip ID register (0xD0)
-    if(chip_id != 0x61) {
-       return BME680_ERROR;
-    } 
-    bme680->par_t1 = readSpi16bitRegister(bme680->hspi, BME680_CDM_T1);
-    bme680->par_t2 = readSpi16bitRegister(bme680->hspi, BME680_CDM_T2);
-    bme680->par_t3 = readSpi8bitRegister(bme680->hspi, BME680_CDM_T3);
-       
-    return BME680_OK;
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_ID, &chip_id)) {
+        return BME680_ERROR;
+    }
+    if (chip_id != 0x61U) {
+        return BME680_ERROR;
+    }
+    if (BME680_OK != readSpi16bitRegister(bme680->hspi, BME680_CDM_T1, &bme680->par_t1)) {
+        return BME680_ERROR;
+    }
+    if (BME680_OK != readSpi16bitRegister(bme680->hspi, BME680_CDM_T2, &raw_t2)) {
+        return BME680_ERROR;
+    }
+    bme680->par_t2 = (int16_t)raw_t2;
 
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_T3, &raw_t3)) {
+        return BME680_ERROR;
+    }
+    bme680->par_t3 = (int8_t)raw_t3;
+
+    return BME680_OK;
 }
 
 BME680_Status BME680_SetForcedMode(BME680_HandleTypeDef *bme680)
 {
-    uint8_t ctrl_meas = readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS);
-    ctrl_meas &= ~0x03; // Clear the mode bits
-    ctrl_meas |= BME680_FORCED_MODE; // Set to forced mode
-    writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
-    return BME680_OK;
+    uint8_t ctrl_meas = 0;
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
+        return BME680_ERROR;
+    }
+    ctrl_meas &= (uint8_t)~0x03U;
+    ctrl_meas |= BME680_FORCED_MODE;
+
+    return writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
 }
 
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
 {
-    uint8_t ctrl_meas = readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS);
-    ctrl_meas &= ~0xE0; // Clear the temperature oversampling bits (bits 7:5)
-    ctrl_meas |= (oversampling << 5); // Set the temperature oversampling (bits 7:5)
-    writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
+    uint8_t ctrl_meas = 0;
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
+        return BME680_ERROR;
+    }
+    ctrl_meas &= (uint8_t)~0xE0U;
+    ctrl_meas |= (uint8_t)(oversampling << 5);
+
+    return writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
+}
+
+BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
+{
+    uint8_t ctrl_hum_check = 0;
+    uint8_t ctrl_hum = 0;
+
+    if (bme680 == NULL || oversampling > 5U) {
+        return BME680_ERROR;
+    }
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_HUM, &ctrl_hum)) {
+        return BME680_ERROR;
+    }
+
+    ctrl_hum &= (uint8_t)~0x07U;
+    ctrl_hum |= oversampling;
+    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_HUM, ctrl_hum)) {
+        return BME680_ERROR;
+    }
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_HUM, &ctrl_hum_check)) {
+        return BME680_ERROR;
+    }
+    if ((ctrl_hum_check & 0x07U) != oversampling) {
+        return BME680_ERROR;
+    }
+
     return BME680_OK;
 }
 
-
 BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
 {
-    uint8_t ctrl_meas = readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS);
-    ctrl_meas &= ~0x1C; // Clear the pressure oversampling bits (bits 4:2)
-    ctrl_meas |= (oversampling << 2); // Set the pressure oversampling (bits 4:2)
-    writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
-    return BME680_OK;
+    uint8_t ctrl_meas = 0;
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
+        return BME680_ERROR;
+    }
+    ctrl_meas &= (uint8_t)~0x1CU;
+    ctrl_meas |= (uint8_t)(oversampling << 2);
+
+    return writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
 }
 
 BME680_Status BME680_ReadTemperature(BME680_HandleTypeDef *bme680, int32_t *temperature)
 {
-    uint32_t adc_temp = readSpi24bitRegister(bme680->hspi, BME680_REG_TEMP_MSB);
-    adc_temp >>= 4; // Right shift to get the 20-bit value
+    uint32_t adc_temp = 0;
 
-    // Compensation formula from the datasheet
+    if (BME680_OK != readSpi24bitRegister(bme680->hspi, &adc_temp, BME680_REG_TEMP_MSB)) {
+        return BME680_ERROR;
+    }
+
+    /* readSpi24bitRegister already returns the 20-bit ADC value. */
     int32_t var1 = ((int32_t)adc_temp >> 3) - ((int32_t)bme680->par_t1 << 1);
     int32_t var2 = (var1 * (int32_t)bme680->par_t2) >> 11;
     int32_t var3 = ((var1 >> 1) * (var1 >> 1)) >> 12;
-    var3 = (var3 * (int32_t)bme680->par_t3) >> 14;
+    var3 = (var3 * ((int32_t)bme680->par_t3 << 4)) >> 14;
 
     int32_t t_fine = var2 + var3;
-    *temperature = (t_fine * 5 + 128) >> 8; // Temperature in Celsius
+    *temperature = (t_fine * 5 + 128) >> 8;
 
     return BME680_OK;
 }
 
 
-
-static uint8_t readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
+static BME680_Status readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint8_t *retValue)
 {
-  tx |= 0x80; // Set MSB for read operation
+    uint8_t retVal = 0;
 
-  uint8_t retVal = 0;
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-  HAL_Delay(100);
-  if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK)
-  {
-      Error_Handler();
-  }
-  if (HAL_SPI_Receive(spiHandle, &retVal, 1, HAL_MAX_DELAY) != HAL_OK)
-  {
-      Error_Handler();
-  }
-  HAL_Delay(100);
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
+    if (tx != BME680_REG_STATUS &&
+        BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
+        return BME680_ERROR;
+    }
+    tx = (tx & 0x7FU) | 0x80U;
 
-  return retVal;
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1);
+    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
+    }
+    if (HAL_SPI_Receive(spiHandle, &retVal, 1, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
+    }
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
 
+    *retValue = retVal;
+    return BME680_OK;
 }
 
-static uint16_t readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
+static BME680_Status readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint16_t *retValue)
 {
-    tx |= 0x80; // Set MSB for read operation
     uint8_t retVal[2] = {0};
-    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-    HAL_Delay(1);
-    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK)
-    {
-        Error_Handler();
+
+    if (tx != BME680_REG_STATUS &&
+        BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
+        return BME680_ERROR;
     }
-    if (HAL_SPI_Receive(spiHandle, (uint8_t*)&retVal, 2, HAL_MAX_DELAY) != HAL_OK)
-    {
-        Error_Handler();
+    tx = (tx & 0x7FU) | 0x80U;
+
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1);
+    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
+    }
+    if (HAL_SPI_Receive(spiHandle, retVal, 2, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
     }
     HAL_Delay(1);
-    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
-    return (retVal[1] << 8) | retVal[0];
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+
+    *retValue = (uint16_t)retVal[0] | ((uint16_t)retVal[1] << 8);
+    return BME680_OK;
 }
 
-static uint32_t readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx)
+static BME680_Status readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint32_t *retValue, uint8_t tx)
 {
-    tx |= 0x80; // Set MSB for read operation
     uint8_t retVal[3] = {0};
-    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-    HAL_Delay(1);
-    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK)
-    {
-        Error_Handler();
+
+    if (tx != BME680_REG_STATUS &&
+        BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
+        return BME680_ERROR;
     }
-    if (HAL_SPI_Receive(spiHandle, (uint8_t*)&retVal, 3, HAL_MAX_DELAY) != HAL_OK)
-    {
-        Error_Handler();
+    tx = (tx & 0x7FU) | 0x80U;
+
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1);
+    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
+    }
+    if (HAL_SPI_Receive(spiHandle, retVal, 3, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
     }
     HAL_Delay(1);
-    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
-    return (retVal[0] << 12) | (retVal[1] << 4) | (retVal[2] >> 4);
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+
+    *retValue = ((uint32_t)retVal[0] << 12) |
+                ((uint32_t)retVal[1] << 4) |
+                ((uint32_t)retVal[2] >> 4);
+    return BME680_OK;
 }
 
-static void writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)
+static BME680_Status setSpiMemoryPage(SPI_HandleTypeDef* spiHandle, uint8_t regAddr)
 {
-  uint8_t tx[2] = {regAddr, value};
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-  HAL_Delay(1);
-  if (HAL_SPI_Transmit(spiHandle, tx, 2, HAL_MAX_DELAY) != HAL_OK)
-  {
-      Error_Handler();
-  }
+    uint8_t pageValue = BME680_SPI_MEM_PAGE0_VALUE;
 
+    /* Low-address registers are on SPI page 1. Chip ID is a page-0 exception. */
+    if (regAddr < 0x80U &&
+        regAddr != BME680_REG_ID &&
+        regAddr != BME680_REG_STATUS) {
+        pageValue = BME680_SPI_MEM_PAGE1_VALUE;
+    }
 
-  HAL_Delay(1);
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
+    return writeSpiRegisterRaw(spiHandle, BME680_REG_STATUS, pageValue);
 }
 
-// #define BME680_MAX_READ_LEN 32U
+static BME680_Status writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)
+{
+    if (regAddr != BME680_REG_STATUS &&
+        BME680_OK != setSpiMemoryPage(spiHandle, regAddr)) {
+        return BME680_ERROR;
+    }
 
-// HAL_StatusTypeDef BME680_ReadRegisters( SPI_HandleTypeDef *spiHandle,uint8_t regAddr,uint8_t *buffer,uint16_t length)
-// {
-//     regAddr |= 0x80; // Set MSB for read operation
-//     if(buffer == NULL || length == 0 || spiHandle == NULL || length > BME680_MAX_READ_LEN)
-//     {
-//         return HAL_ERROR;
-//     }
+    /* The SPI read/write bit is clear for a write transaction. */
+    return writeSpiRegisterRaw(spiHandle, regAddr & 0x7FU, value);
+}
 
-//     uint16_t txSize = 1 + length; // 1 byte for register address + length of data to read
+static BME680_Status writeSpiRegisterRaw(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)
+{
+    uint8_t tx[2] = {regAddr, value};
 
-//     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Set CS low
-//     HAL_Delay(1);
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1);
 
-//     uint8_t txbuffer[BME680_MAX_READ_LEN+1] = {regAddr, 0}; // Prepare transmit buffer with register address and dummy byte
-//     uint8_t rxBuffer[BME680_MAX_READ_LEN + 1U] = {0};
-    
-// 	if(HAL_SPI_TransmitReceive(spiHandle, txbuffer, rxBuffer, txSize, HAL_MAX_DELAY) != HAL_OK) // Transmit register address and receive chip ID
-// 	{
-// 	    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
-// 	    return HAL_ERROR;
-// 	}
+    if (HAL_SPI_Transmit(spiHandle, tx, 2, HAL_MAX_DELAY) != HAL_OK) {
+        HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+        return BME680_ERROR;
+    }
 
-//     // Copy the received data to the output buffer
-//     for(uint16_t i = 0; i < length; i++)
-//     {
-//         buffer[i] = rxBuffer[i + 1];
-//     }
-
-//     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Set CS high
-
-//     return HAL_OK;
-
-// }
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+    return BME680_OK;
+}

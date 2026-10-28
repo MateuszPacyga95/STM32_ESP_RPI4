@@ -62,6 +62,7 @@ BME680_Status BME680_SetForcedMode(BME680_HandleTypeDef *bme680);
 BME680_Status BME680_CalculateTemperature(BME680_HandleTypeDef *bme680, int32_t adc_temp, int32_t *temp);
 BME680_Status BME680_ReadTemperature    (BME680_HandleTypeDef *bme680, int32_t *temperature);
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
+BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 
 #endif /* INC_BME680_H */
 
