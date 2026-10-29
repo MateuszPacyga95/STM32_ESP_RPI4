@@ -43,17 +43,35 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     return BME680_OK;
 }
 
-BME680_Status BME680_SetForcedMode(BME680_HandleTypeDef *bme680)
+BME680_Status BME680_SetForcedMode(BME680_HandleTypeDef *bme680, uint8_t mode)
 {
+    uint8_t ctrl_meas_check = 0;
     uint8_t ctrl_meas = 0;
+
+    if (bme680 == NULL || mode > 3U) {
+        return BME680_ERROR;
+    }
 
     if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
         return BME680_ERROR;
     }
-    ctrl_meas &= (uint8_t)~0x03U;
-    ctrl_meas |= BME680_FORCED_MODE;
+    ctrl_meas &= (uint8_t)~0x03U; // Clear the mode bits (bits 0 and 1)
+    ctrl_meas |= mode;
+        
 
-    return writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas);
+
+    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas)) {
+        return BME680_ERROR;
+    }
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas_check)) {
+        return BME680_ERROR;
+    }
+
+    if ((ctrl_meas_check & 0x03U) != mode) {
+        return BME680_ERROR;
+    }
+    return BME680_OK;
 }
 
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
@@ -99,6 +117,63 @@ BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8
 
 BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
 {
+    uint8_t ctrl_press_check = 0;
+    uint8_t ctrl_press = 0;
+
+    if (bme680 == NULL || oversampling > 5U) {
+        return BME680_ERROR;
+    }
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_press)) {
+        return BME680_ERROR;
+    }
+
+    ctrl_press &= (uint8_t)~0x1CU;
+    ctrl_press |= oversampling << 2;
+    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_press)) {
+        return BME680_ERROR;
+    }
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_press_check)) {
+        return BME680_ERROR;
+    }
+    if ((ctrl_press_check & 0x1CU) != oversampling) {
+        return BME680_ERROR;
+    }
+
+    return BME680_OK;
+}
+
+BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
+{
+    uint8_t ctrl_hum_check = 0;
+    uint8_t ctrl_hum = 0;
+
+    if (bme680 == NULL || oversampling > 5U) {
+        return BME680_ERROR;
+    }
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_hum)) {
+        return BME680_ERROR;
+    }
+
+    ctrl_hum &= (uint8_t)~0xE0U;
+    ctrl_hum |= oversampling << 5;
+    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_hum)) {
+        return BME680_ERROR;
+    }
+
+    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_hum_check)) {
+        return BME680_ERROR;
+    }
+    if ((ctrl_hum_check & 0xE0U) != oversampling) {
+        return BME680_ERROR;
+    }
+
+    return BME680_OK;
+}
+
+
+BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling)
+{
     uint8_t ctrl_meas = 0;
 
     if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
@@ -139,7 +214,7 @@ static BME680_Status readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t t
         BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
         return BME680_ERROR;
     }
-    tx = (tx & 0x7FU) | 0x80U;
+    tx |= 0x80U;
 
     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
     HAL_Delay(1);
@@ -166,7 +241,7 @@ static BME680_Status readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t 
         BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
         return BME680_ERROR;
     }
-    tx = (tx & 0x7FU) | 0x80U;
+    tx |= 0x80U; 
 
     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
     HAL_Delay(1);
@@ -193,7 +268,7 @@ static BME680_Status readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint32_t
         BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
         return BME680_ERROR;
     }
-    tx = (tx & 0x7FU) | 0x80U;
+    tx |= 0x80U;
 
     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
     HAL_Delay(1);

@@ -119,6 +119,8 @@ int main(void)
   {//TEST
 	  BME680_SetForcedMode(&bme680); // Set BME680 to forced mode
 	  HAL_Delay(108);
+      BME680_ReadTemperature(&bme680, &temperature); // Read temperature from BME680
+
 
 	  //extern SPI_HandleTypeDef hspi1;
 	  //
