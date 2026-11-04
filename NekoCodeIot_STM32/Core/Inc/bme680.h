@@ -37,6 +37,8 @@
 #define BME680_T_OVERSAMPLING_1X          0x01
 
 #define BME680_REG_TEMP_MSB         0x22
+#define BME680_REG_HUM_MSB          0x25
+#define BME680_REG_PRESS_MSB        0x1F
 
 typedef struct 
 {
@@ -48,6 +50,26 @@ typedef struct
     uint16_t par_t1;
     int16_t par_t2;
     int8_t par_t3;
+    uint16_t par_h1;
+    uint16_t par_h2;
+    int8_t par_h3;
+    int8_t par_h4;
+    int8_t par_h5;
+    uint8_t par_h6;
+    int8_t par_h7;
+    int8_t par_gh1;
+    int16_t par_gh2;
+    int8_t par_gh3;
+    uint16_t par_p1;
+    int16_t par_p2;
+    int8_t par_p3;
+    int16_t par_p4;
+    int16_t par_p5;
+    int8_t par_p6;
+    int8_t par_p7;
+    int16_t par_p8;
+    int16_t par_p9;
+
 } BME680_HandleTypeDef;
 
 typedef enum
@@ -58,12 +80,13 @@ typedef enum
 
 
 BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi);
-BME680_Status BME680_SetForcedMode(BME680_HandleTypeDef *bme680);
-BME680_Status BME680_CalculateTemperature(BME680_HandleTypeDef *bme680, int32_t adc_temp, int32_t *temp);
-BME680_Status BME680_ReadTemperature    (BME680_HandleTypeDef *bme680, int32_t *temperature);
+BME680_Status BME680_SetMode(BME680_HandleTypeDef *bme680, uint8_t mode);
+BME680_Status BME680_ReadTemperature(BME680_HandleTypeDef *bme680, int32_t *temperature);
+BME680_Status BME680_ReadHumidity(BME680_HandleTypeDef *bme680, int32_t *humidity);
+BME680_Status BME680_ReadPressure(BME680_HandleTypeDef *bme680, int32_t *pressure);
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
-
+BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 #endif /* INC_BME680_H */
 
 
