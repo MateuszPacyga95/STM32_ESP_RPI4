@@ -49,6 +49,9 @@
 /* USER CODE BEGIN PV */
 BME680_HandleTypeDef bme680;
 int32_t temperature = 0;
+int32_t hum = 0;
+int32_t press = 0;
+uint16_t gas_raw = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,17 +102,21 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  uint8_t message[] = "HELLO\r\n";
+  uint32_t raw_pressure = 415328;
+char tx_buffer[64];
+
 
   
   BME680_Init(&bme680, &hspi2); // Initialize BME680 with SPI handle and I2C address
 
-  BME680_SetHumidityOversampling(&bme680, 4U);
+ BME680_SetHumidityOversampling(&bme680, 4U);
 
 
 
   BME680_SetTemperatureOversampling(&bme680, BME680_T_OVERSAMPLING_1X); // Set temperature oversampling to 1x
 
-  BME680_SetForcedMode(&bme680); // Set BME680 to forced mode
+  BME680_SetMode(&bme680, BME680_FORCED_MODE); // Set BME680 to forced mode
   BME680_ReadTemperature(&bme680, &temperature); // Read temperature from BME680
   /* USER CODE END 2 */
 
@@ -117,9 +124,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {//TEST
-	  BME680_SetForcedMode(&bme680); // Set BME680 to forced mode
-	  HAL_Delay(108);
-      BME680_ReadTemperature(&bme680, &temperature); // Read temperature from BME680
+	 BME680_SetMode(&bme680, BME680_FORCED_MODE); // Set BME680 to forced mode
+    BME680_SetPressureOversampling(&bme680, 4U); // Set pressure oversampling to 4x
+    HAL_Delay(108);
+    BME680_ReadTemperature(&bme680, &temperature); // Read temperature from BME680
+    BME680_ReadHumidity(&bme680, &hum); // Read temperature from BME680
+    BME680_ReadPressure(&bme680, &press); // Read temperature from BME680
+    BME680_ReadGasRaw(&bme680, &gas_raw); // Read gas resistance from BME680
+    int len = snprintf(tx_buffer, sizeof(tx_buffer),
+                   "TEMP:%lu, HUM:%lu, PRESS:%lu,",
+                   (unsigned long)temperature,
+                   (unsigned long)hum,
+                   (unsigned long)press);
+    HAL_UART_Transmit(&huart2, (uint8_t *)tx_buffer, len, 100);
+//    char temp_str[20];
+
+
 
 
 	  //extern SPI_HandleTypeDef hspi1;

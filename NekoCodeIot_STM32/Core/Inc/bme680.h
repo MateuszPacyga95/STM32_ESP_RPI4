@@ -33,17 +33,42 @@
 #define BME680_CDM_T2               0x8A
 #define BME680_CDM_T3               0x8C
 
+
+#define BME680_CDM_P1               0x8E
+#define BME680_CDM_P2               0x90
+#define BME680_CDM_P3               0x92
+#define BME680_CDM_P4               0x94
+#define BME680_CDM_P5               0x96
+#define BME680_CDM_P6               0x99
+#define BME680_CDM_P7               0x98
+#define BME680_CDM_P8               0x9C
+#define BME680_CDM_P9               0x9E
+#define BME680_CDM_P10              0xA0
+
+#define BME680_CDM_H2_MSB           0xE1
+#define BME680_CDM_H1_H2_LSB        0xE2
+#define BME680_CDM_H1_MSB           0xE3
+#define BME680_CDM_H3               0xE4
+#define BME680_CDM_H4               0xE5
+#define BME680_CDM_H5               0xE6
+#define BME680_CDM_H6               0xE7
+#define BME680_CDM_H7               0xE8
+
+
+
 #define BME680_T_OVERSAMPLING_NONE        0x00
 #define BME680_T_OVERSAMPLING_1X          0x01
 
 #define BME680_REG_TEMP_MSB         0x22
 #define BME680_REG_HUM_MSB          0x25
 #define BME680_REG_PRESS_MSB        0x1F
+#define BME680_GAS_R_MSB            0x2A
 
 typedef struct 
 {
     SPI_HandleTypeDef *hspi;
     uint8_t address;
+    int32_t t_fine;
     
 
     //caliration data
@@ -57,7 +82,7 @@ typedef struct
     int8_t par_h5;
     uint8_t par_h6;
     int8_t par_h7;
-    int8_t par_gh1;
+    int8_t par_wwwwh1;
     int16_t par_gh2;
     int8_t par_gh3;
     uint16_t par_p1;
@@ -69,7 +94,7 @@ typedef struct
     int8_t par_p7;
     int16_t par_p8;
     int16_t par_p9;
-
+    uint8_t par_p10;
 } BME680_HandleTypeDef;
 
 typedef enum
@@ -78,6 +103,13 @@ typedef enum
     BME680_ERROR = 1
 } BME680_Status;
 
+typedef struct
+{
+    uint16_t gas_raw;   /* 10-bit gas ADC: 0..1023 */
+    uint8_t gas_range;  /* 0..15 */
+    uint8_t gas_valid;  /* 0 lub 1 */
+    uint8_t heat_stab;  /* 0 lub 1 */
+} BME680_GasSample;
 
 BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi);
 BME680_Status BME680_SetMode(BME680_HandleTypeDef *bme680, uint8_t mode);
@@ -87,6 +119,8 @@ BME680_Status BME680_ReadPressure(BME680_HandleTypeDef *bme680, int32_t *pressur
 BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
 BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8_t oversampling);
+BME680_Status BME680_ReadGasRaw(BME680_HandleTypeDef *bme680,uint16_t *gas_raw);
+
 #endif /* INC_BME680_H */
 
 
