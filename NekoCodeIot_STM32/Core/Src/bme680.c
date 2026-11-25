@@ -6,14 +6,51 @@
 #define BME680_SPI_MEM_PAGE0_VALUE 0x00U
 #define BME680_SPI_MEM_PAGE1_VALUE 0x10U
 
-static BME680_Status writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
+static BME680_Status writeSpiRegister(BME680_HandleTypeDef *bme680, uint8_t regAddr, uint8_t value);
 static BME680_Status writeSpiRegisterRaw(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value);
 static BME680_Status setSpiMemoryPage(SPI_HandleTypeDef* spiHandle, uint8_t regAddr);
-static BME680_Status readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint8_t *retValue);
+static BME680_Status readSpi8bitRegister(BME680_HandleTypeDef *bme680, uint8_t tx, uint8_t *retValue);
 static BME680_Status readSpi16bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint16_t *retValue);
 static BME680_Status readSpi16bitRegisterLSBFirst(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint16_t *retValue);
 static BME680_Status readSpi24bitRegister(SPI_HandleTypeDef* spiHandle, uint32_t *retValue, uint8_t tx);
 //static BME680_Status readSpi10bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint16_t *retValue);
+
+
+void BME680_Wait(BME680_HandleTypeDef *bme680, uint32_t delay_ms)
+{
+    if(bme680 == NULL || bme680->delay_cb == NULL)
+    {
+        return;
+    }
+
+    bme680->delay_cb(delay_ms);
+}
+
+BME680_Status BME680_Send8(BME680_HandleTypeDef *bme680,
+                 uint8_t regAddr, uint8_t value)
+{
+    if(bme680 == NULL || bme680->write_cb_8 == NULL )
+    {
+        return BME680_ERROR; 
+    }
+
+    return bme680->write_cb_8(bme680, regAddr, value); // Write the first byte (register address) and second byte (data) to the BME680
+
+}
+
+
+BME680_Status BME680_ReadRegister8(
+    BME680_HandleTypeDef *bme680,
+    uint8_t reg,
+    uint8_t *data)
+{
+    if (bme680 == NULL || bme680->read_cb_8 == NULL || data == NULL) {
+        return BME680_ERROR; // Return error if any pointer is NULL
+    }
+
+    return bme680->read_cb_8(bme680, reg, data); // Read the register value from the BME680
+}
+
 
 
 BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
@@ -21,6 +58,9 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     if (bme680 == NULL || hspi == NULL) {
         return BME680_ERROR;
     }
+    bme680->delay_cb = HAL_Delay;
+    bme680->read_cb_8 = readSpi8bitRegister;
+    bme680->write_cb_8 = writeSpiRegister;
     uint8_t chip_id = 0;
     uint16_t raw_t2 = 0;
     uint8_t raw_t3 = 0;
@@ -32,7 +72,6 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     uint8_t raw_p7 = 0;
     uint16_t raw_p8 = 0;
     uint16_t raw_p9 = 0;
-    uint8_t raw_p10 = 0;
     uint8_t raw_h2_msb = 0;
     uint8_t raw_h_shared = 0;
     uint8_t raw_h1_msb = 0;
@@ -43,7 +82,7 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
 
     bme680->hspi = hspi;
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_ID, &chip_id)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_ID, &chip_id)) {
         return BME680_ERROR;
     }
     if (chip_id != 0x61U) {
@@ -57,7 +96,7 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     }
     bme680->par_t2 = (int16_t)raw_t2;
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_T3, &raw_t3)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_T3, &raw_t3)) {
         return BME680_ERROR;
     }
     bme680->par_t3 = (int8_t)raw_t3;
@@ -70,7 +109,7 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     }
     bme680->par_p2 = (int16_t)raw_p2;
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_P3, &raw_p3)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_P3, &raw_p3)) {
         return BME680_ERROR;
     }
     bme680->par_p3 = (int8_t)raw_p3;
@@ -84,11 +123,11 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
         return BME680_ERROR;
     }
     bme680->par_p5 = (int16_t)raw_p5;
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_P6, &raw_p6)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_P6, &raw_p6)) {
         return BME680_ERROR;
     }
     bme680->par_p6 = (int8_t)raw_p6;
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_P7, &raw_p7)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_P7, &raw_p7)) {
         return BME680_ERROR;
     }
     bme680->par_p7 = (int8_t)raw_p7;
@@ -103,36 +142,36 @@ BME680_Status BME680_Init(BME680_HandleTypeDef *bme680, SPI_HandleTypeDef *hspi)
     }
     bme680->par_p9 = (int16_t)raw_p9;
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_P10, &bme680->par_p10)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_P10, &bme680->par_p10)) {
         return BME680_ERROR;
     }
     
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H2_MSB, &raw_h2_msb) ||
-    BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H1_H2_LSB, &raw_h_shared) ||
-    BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H1_MSB, &raw_h1_msb)) 
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H2_MSB, &raw_h2_msb) ||
+    BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H1_H2_LSB, &raw_h_shared) ||
+    BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H1_MSB, &raw_h1_msb)) 
     {
         return BME680_ERROR;
     }
     bme680->par_h1 = ((uint16_t)raw_h1_msb << 4) | (raw_h_shared & 0x0F);
     bme680->par_h2 = ((uint16_t)raw_h2_msb << 4) | ((raw_h_shared >> 4) & 0x0F);
     
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H3, &raw_h3)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H3, &raw_h3)) {
         return BME680_ERROR;
     }
     bme680->par_h3 = (int8_t)raw_h3;
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H4, &raw_h4)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H4, &raw_h4)) {
         return BME680_ERROR;
     }
     bme680->par_h4 = (int8_t)raw_h4;
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H5, &raw_h5)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H5, &raw_h5)) {
         return BME680_ERROR;
     }
     bme680->par_h5 = (int8_t)raw_h5;
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H6, &bme680->par_h6)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H6, &bme680->par_h6)) {
         return BME680_ERROR;
     }
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_CDM_H7, &raw_h7)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_CDM_H7, &raw_h7)) {
         return BME680_ERROR;
     }
     bme680->par_h7 = (int8_t)raw_h7;
@@ -148,7 +187,7 @@ BME680_Status BME680_SetMode(BME680_HandleTypeDef *bme680, uint8_t mode)
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
         return BME680_ERROR;
     }
     ctrl_meas &= (uint8_t)~0x03U; // Clear the mode bits (bits 0 and 1)
@@ -156,17 +195,17 @@ BME680_Status BME680_SetMode(BME680_HandleTypeDef *bme680, uint8_t mode)
         
 
 
-    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas)) {
+    if (BME680_OK != BME680_Send8(bme680, BME680_REG_CTRL_MEAS, ctrl_meas)) {
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas_check)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_meas_check)) {
         return BME680_ERROR;
     }
 
-    // if ((ctrl_meas_check & 0x03U) != mode) {
-    //     return BME680_ERROR;
-    // }
+     if ((ctrl_meas_check & 0x03U) != mode) {
+         return BME680_ERROR;
+     }
     return BME680_OK;
 }
 
@@ -179,17 +218,17 @@ BME680_Status BME680_SetTemperatureOversampling(BME680_HandleTypeDef *bme680, ui
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_meas)) {
         return BME680_ERROR;
     }
     ctrl_meas &= (uint8_t)~0xE0U;
     ctrl_meas |= (uint8_t)(oversampling << 5);
 
-    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_meas)) {
+    if (BME680_OK != BME680_Send8(bme680, BME680_REG_CTRL_MEAS, ctrl_meas)) {
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_temp_check)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_temp_check)) {
         return BME680_ERROR;
     }
     if (((ctrl_temp_check & 0xE0U) >> 5) != oversampling) {
@@ -210,17 +249,17 @@ BME680_Status BME680_SetHumidityOversampling(BME680_HandleTypeDef *bme680, uint8
     if (bme680 == NULL || oversampling > 5U) {
         return BME680_ERROR;
     }
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_HUM, &ctrl_hum)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_HUM, &ctrl_hum)) {
         return BME680_ERROR;
     }
 
     ctrl_hum &= (uint8_t)~0x07U;
     ctrl_hum |= oversampling;
-    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_HUM, ctrl_hum)) {
+    if (BME680_OK != BME680_Send8(bme680, BME680_REG_CTRL_HUM, ctrl_hum)) {
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_HUM, &ctrl_hum_check)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_HUM, &ctrl_hum_check)) {
         return BME680_ERROR;
     }
     if ((ctrl_hum_check & 0x07U) != oversampling) {
@@ -238,17 +277,17 @@ BME680_Status BME680_SetPressureOversampling(BME680_HandleTypeDef *bme680, uint8
     if (bme680 == NULL || oversampling > 5U) {
         return BME680_ERROR;
     }
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_press)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_press)) {
         return BME680_ERROR;
     }
 
     ctrl_press &= (uint8_t)~0x1CU;
     ctrl_press |= oversampling << 2;
-    if (BME680_OK != writeSpiRegister(bme680->hspi, BME680_REG_CTRL_MEAS, ctrl_press)) {
+    if (BME680_OK != BME680_Send8(bme680, BME680_REG_CTRL_MEAS, ctrl_press)) {
         return BME680_ERROR;
     }
 
-    if (BME680_OK != readSpi8bitRegister(bme680->hspi, BME680_REG_CTRL_MEAS, &ctrl_press_check)) {
+    if (BME680_OK != BME680_ReadRegister8(bme680, BME680_REG_CTRL_MEAS, &ctrl_press_check)) {
         return BME680_ERROR;
     }
     if (((ctrl_press_check & 0x1CU) >> 2) != oversampling) {
@@ -449,28 +488,28 @@ BME680_Status BME680_ReadGasRaw(BME680_HandleTypeDef *bme680,uint16_t *gas_raw)
 
 
 
-static BME680_Status readSpi8bitRegister(SPI_HandleTypeDef* spiHandle, uint8_t tx, uint8_t *retValue)
+static BME680_Status readSpi8bitRegister(BME680_HandleTypeDef *bme680, uint8_t tx, uint8_t *retValue)
 {
     uint8_t retVal = 0;
 
-    if(spiHandle == NULL || retValue == NULL)
+    if(bme680 == NULL || retValue == NULL)
     {
         return BME680_ERROR;
     }
 
     if (tx != BME680_REG_STATUS &&
-        BME680_OK != setSpiMemoryPage(spiHandle, tx)) {
+        BME680_OK != setSpiMemoryPage(bme680->hspi, tx)) {
         return BME680_ERROR;
     }
     tx |= 0x80U;
 
     HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
     HAL_Delay(1);
-    if (HAL_SPI_Transmit(spiHandle, &tx, 1, HAL_MAX_DELAY) != HAL_OK) {
+    if (HAL_SPI_Transmit(bme680->hspi, &tx, 1, HAL_MAX_DELAY) != HAL_OK) {
         HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
         return BME680_ERROR;
     }
-    if (HAL_SPI_Receive(spiHandle, &retVal, 1, HAL_MAX_DELAY) != HAL_OK) {
+    if (HAL_SPI_Receive(bme680->hspi, &retVal, 1, HAL_MAX_DELAY) != HAL_OK) {
         HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
         return BME680_ERROR;
     }
@@ -627,15 +666,15 @@ static BME680_Status setSpiMemoryPage(SPI_HandleTypeDef* spiHandle, uint8_t regA
     return writeSpiRegisterRaw(spiHandle, BME680_REG_STATUS, pageValue);
 }
 
-static BME680_Status writeSpiRegister(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)
+static BME680_Status writeSpiRegister(BME680_HandleTypeDef *bme680, uint8_t regAddr, uint8_t value)
 {
     if (regAddr != BME680_REG_STATUS &&
-        BME680_OK != setSpiMemoryPage(spiHandle, regAddr)) {
+        BME680_OK != setSpiMemoryPage(bme680->hspi, regAddr)) {
         return BME680_ERROR;
     }
 
     /* The SPI read/write bit is clear for a write transaction. */
-    return writeSpiRegisterRaw(spiHandle, regAddr & 0x7FU, value);
+    return writeSpiRegisterRaw(bme680->hspi, regAddr & 0x7FU, value);
 }
 
 static BME680_Status writeSpiRegisterRaw(SPI_HandleTypeDef* spiHandle, uint8_t regAddr, uint8_t value)

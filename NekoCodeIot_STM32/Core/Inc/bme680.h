@@ -64,44 +64,49 @@
 #define BME680_REG_PRESS_MSB        0x1F
 #define BME680_GAS_R_MSB            0x2A
 
-typedef struct 
-{
-    SPI_HandleTypeDef *hspi;
-    uint8_t address;
-    int32_t t_fine;
-    
-
-    //caliration data
-    uint16_t par_t1;
-    int16_t par_t2;
-    int8_t par_t3;
-    uint16_t par_h1;
-    uint16_t par_h2;
-    int8_t par_h3;
-    int8_t par_h4;
-    int8_t par_h5;
-    uint8_t par_h6;
-    int8_t par_h7;
-    int8_t par_wwwwh1;
-    int16_t par_gh2;
-    int8_t par_gh3;
-    uint16_t par_p1;
-    int16_t par_p2;
-    int8_t par_p3;
-    int16_t par_p4;
-    int16_t par_p5;
-    int8_t par_p6;
-    int8_t par_p7;
-    int16_t par_p8;
-    int16_t par_p9;
-    uint8_t par_p10;
-} BME680_HandleTypeDef;
-
 typedef enum
 {
     BME680_OK = 0,
     BME680_ERROR = 1
 } BME680_Status;
+
+typedef struct BME680_HandleTypeDef
+    {
+        SPI_HandleTypeDef *hspi;
+        uint8_t address;
+        int32_t t_fine;
+        
+
+        //caliration data
+        uint16_t par_t1;
+        int16_t par_t2;
+        int8_t par_t3;
+        uint16_t par_h1;
+        uint16_t par_h2;
+        int8_t par_h3;
+        int8_t par_h4;
+        int8_t par_h5;
+        uint8_t par_h6;
+        int8_t par_h7;
+        int8_t par_wwwwh1;
+        int16_t par_gh2;
+        int8_t par_gh3;
+        uint16_t par_p1;
+        int16_t par_p2;
+        int8_t par_p3;
+        int16_t par_p4;
+        int16_t par_p5;
+        int8_t par_p6;
+        int8_t par_p7;
+        int16_t par_p8;
+        int16_t par_p9;
+        uint8_t par_p10;
+        BME680_Status (*read_cb_8)(struct BME680_HandleTypeDef *bme680, uint8_t tx, uint8_t *retValue);
+        BME680_Status (*write_cb_8)(struct BME680_HandleTypeDef *bme680, uint8_t regAddr, uint8_t value);
+        void(*delay_cb)(uint32_t delay_ms);
+    } BME680_HandleTypeDef;
+
+
 
 typedef struct
 {
